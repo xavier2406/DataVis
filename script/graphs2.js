@@ -2,6 +2,9 @@ function init() {
   var w = 800;
   var h = 600;
   var padding = 80;
+  var svg = null; // Store reference to the SVG element
+  var originalData = null; // Store the original dataset
+  var colorScale = d3.scaleOrdinal(d3.schemeTableau10); // Color scale for state categories
 
   d3.csv("csv/ausDepartures.csv").then(function(data) {
     data.forEach(function(d) {
@@ -9,7 +12,8 @@ function init() {
       d.Value = +d.Value;
     });
 
-    drawBarChart(data);
+    originalData = data; // Save the original dataset
+    drawBarChart(originalData);
   });
 
   function drawBarChart(dataset) {
@@ -25,8 +29,6 @@ function init() {
       return d.Value;
     });
 
-    var colorScale = d3.scaleOrdinal(d3.schemeCategory10);
-
     var xScale = d3.scaleBand()
       .domain(years)
       .range([padding, w - padding])
@@ -36,10 +38,14 @@ function init() {
       .domain([0, d3.max(values)])
       .range([h - padding, padding]);
 
-    var svg = d3.select(".barChart")
-      .append("svg")
-      .attr("width", w)
-      .attr("height", h);
+    if (!svg) {
+      svg = d3.select(".barChart")
+        .append("svg")
+        .attr("width", w)
+        .attr("height", h);
+    } else {
+      svg.selectAll("rect").remove(); // Remove existing bars
+    }
 
     var yAxis = d3.axisLeft()
       .ticks(10)
@@ -75,52 +81,37 @@ function init() {
       .style("fill", function(d) {
         return colorScale(d.Category);
       })
-      .on("mouseover", function(d) {
+      .on("mouseover", function(d, i) {
         d3.select(this)
           .style("stroke", "black")
           .style("stroke-width", "2px");
         tooltip.style("visibility", "visible")
-          .html("Value: " + d.Value)
-          .style("left", (d3.event.pageX) + "px")
-          .style("top", (d3.event.pageY) + "px");
+          .html(i.Category + ": " + i.Value.toLocaleString())
+          .style("left", (+950) + "px")
+          .style("top", (+270) + "px");
       })
       .on("mouseout", function(d) {
         d3.select(this)
           .style("stroke", "none");
         tooltip.style("visibility", "hidden");
       });
-      
-      
-
-    // svg.selectAll("text")
-    //   .data(dataset)
-    //   .enter()
-    //   .append("text")
-    //   .text(function(d) {
-    //     return d.Value;
-    //   })
-    //   .attr("x", function(d) {
-    //     return xScale(d.Year) + xScale.bandwidth() / 2;
-    //   })
-    //   .attr("y", function(d) {
-    //     return yScale(d.Value) - 5;
-    //   })
-    //   .attr("text-anchor", "middle")
-    //   .attr("font-size", "12px")
-    //   .attr("fill", "black");
 
     svg.append("g")
       .attr("transform", "translate(0," + (h - padding) + ")")
-      .call(d3.axisBottom(xScale));
+      .call(d3.axisBottom(xScale))
+      .style("font-size", "12px")
+      .style("font-weight", "bold");
 
     svg.append("g")
       .attr("transform", "translate(" + padding + ",0)")
-      .call(yAxis);
+      .call(yAxis)
+      .style("font-size", "12px");
 
     svg.append("text")
       .attr("class", "axis-title")
       .attr("x", w / 2)
       .attr("y", h - padding + 40)
+      .attr("font-weight", "bold")
       .attr("text-anchor", "middle")
       .text("Year");
 
@@ -128,7 +119,8 @@ function init() {
       .attr("class", "axis-title")
       .attr("transform", "rotate(-90)")
       .attr("x", -h / 2)
-      .attr("y", padding - 50)
+      .attr("y", padding - 60)
+      .attr("font-weight", "bold")
       .attr("text-anchor", "middle")
       .text("Amount of Departures");
 
@@ -149,7 +141,9 @@ function init() {
       .attr("y", 0)
       .attr("width", 10)
       .attr("height", 10)
-      .style("fill", colorScale);
+      .style("fill", function(d) {
+        return colorScale(d);
+      });
 
     legendItem.append("text")
       .attr("x", 15)
@@ -158,6 +152,46 @@ function init() {
         return d;
       })
       .attr("font-size", "12px");
+
+    // Add checkbox input to legend items
+    legendItem.append("foreignObject")
+      .attr("x", -20)
+      .attr("y", -5)
+      .attr("width", 15)
+      .attr("height", 15)
+      .html(function(d) {
+        return '<input type="checkbox" class="checkbox" value="' + d + '" checked>';
+      });
+
+    // Handle checkbox change event
+    d3.selectAll(".checkbox").on("change", function() {
+      var checkedStates = [];
+      d3.selectAll(".checkbox").each(function() {
+        if (this.checked) {
+          checkedStates.push(this.value);
+        }
+      });
+
+      // Filter dataset based on checked states
+      var filteredData = originalData.filter(function(d) {
+        return checkedStates.includes(d.Category);
+      });
+
+      // Update the bars based on filtered data
+      svg.selectAll("rect")
+        .data(filteredData)
+        .transition()
+        .duration(500)
+        .attr("y", function(d) {
+          return yScale(d.Value);
+        })
+        .attr("height", function(d) {
+          return h - padding - yScale(d.Value);
+        })
+        .style("fill", function(d) {
+          return colorScale(d.Category);
+        });
+    });
   }
 
 }

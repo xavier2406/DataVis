@@ -141,7 +141,7 @@ function init() {
         .on("mouseover", function(d) {
             var arrival = d3.select(this).datum()[state];
             tooltip.style("visibility", "visible")
-              .html("Arrivals: " + arrival);
+              .html("Arrivals: " + arrival.toLocaleString());
           
             // Get the position of the dot
             var dot = d3.select(this);
